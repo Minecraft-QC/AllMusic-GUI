@@ -1,0 +1,24 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Reusing configuration cache.
+> Task :validateAccessWidener NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :processClientResources NO-SOURCE
+> Task :processResources UP-TO-DATE
+> Task :processIncludeJars UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :sourcesJar
+> Task :compileClientJava
+> Task :clientClasses
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :jar
+> Task :assemble
+> Task :build
+
+BUILD SUCCESSFUL in 15s
+6 actionable tasks: 3 executed, 3 up-to-date
+Configuration cache entry reused.

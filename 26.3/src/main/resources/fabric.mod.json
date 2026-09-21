@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "allmusic-gui",
+	"version": "${version}",
+	"name": "AllMusic GUI",
+	"description": "AllMusic 客户端点歌界面：本地歌单 / 网易云歌单同步 / 歌曲搜索，点歌通过 /music 命令发送。",
+	"authors": [
+		"QC"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/allmusic-gui/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.allmusicgui.client.AllMusicGUIClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
