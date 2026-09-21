@@ -1,3 +1,5 @@
+# 本项目由AI辅助开发
+
 # AllMusic GUI
 
 Minecraft Fabric 客户端模组：为 [AllMusic](https://github.com/Coloryr/AllMusic) 服务端插件提供游戏内点歌界面。
