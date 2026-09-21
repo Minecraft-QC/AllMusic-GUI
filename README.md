@@ -48,4 +48,4 @@ Cookie 仅保存在本地 `config/allmusic-gui/playlists.json`。
 
 ## 许可证
 
-CC0-1.0
+[MIT](LICENSE)
