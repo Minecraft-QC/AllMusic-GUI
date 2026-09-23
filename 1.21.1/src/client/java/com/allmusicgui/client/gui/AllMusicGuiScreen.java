@@ -30,6 +30,10 @@ public class AllMusicGuiScreen extends Screen {
 	private static final int TAB_H = 24;
 	private static final int GLFW_KEY_ENTER = 257;
 	private static final int GLFW_KEY_KP_ENTER = 335;
+	private static final int GLFW_KEY_UP = 265;
+	private static final int GLFW_KEY_DOWN = 264;
+	private static final int GLFW_KEY_DELETE = 261;
+	private static final int GLFW_KEY_BACKSPACE = 259;
 	private static final int LEFT_COL_W = 250;
 
 	private final PlaylistStore store = new PlaylistStore();
@@ -475,6 +479,8 @@ public class AllMusicGuiScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		boolean inputFocused = (inputBox != null && inputBox.isFocused())
+				|| (cookieBox != null && cookieBox.isFocused());
 		if ((keyCode == GLFW_KEY_ENTER || keyCode == GLFW_KEY_KP_ENTER) && cookieBox != null && cookieBox.isFocused()) {
 			doLogin(cookieBox.getValue().trim());
 			return true;
@@ -487,6 +493,19 @@ public class AllMusicGuiScreen extends Screen {
 			}
 			if (tab == Tab.PLAYLIST) {
 				doSync();
+				return true;
+			}
+		}
+		// 键盘/手柄导航：输入框未聚焦时，方向键选择歌曲，Enter 播放，Delete 移除
+		if (!inputFocused && list != null && list.hasSongs()) {
+			if (keyCode == GLFW_KEY_UP) { list.moveUp(); return true; }
+			if (keyCode == GLFW_KEY_DOWN) { list.moveDown(); return true; }
+			if ((keyCode == GLFW_KEY_ENTER || keyCode == GLFW_KEY_KP_ENTER) && list.hasSelection()) {
+				list.activateSelected();
+				return true;
+			}
+			if ((keyCode == GLFW_KEY_DELETE || keyCode == GLFW_KEY_BACKSPACE) && tab == Tab.LOCAL && list.hasSelection()) {
+				removeSelected();
 				return true;
 			}
 		}

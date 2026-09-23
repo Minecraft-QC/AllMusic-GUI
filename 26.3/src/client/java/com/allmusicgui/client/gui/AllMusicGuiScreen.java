@@ -34,6 +34,10 @@ public class AllMusicGuiScreen extends Screen {
 	private static final int TAB_H = 24;
 	private static final int GLFW_KEY_ENTER = 257;
 	private static final int GLFW_KEY_KP_ENTER = 335;
+	private static final int GLFW_KEY_UP = 265;
+	private static final int GLFW_KEY_DOWN = 264;
+	private static final int GLFW_KEY_DELETE = 261;
+	private static final int GLFW_KEY_BACKSPACE = 259;
 	private static final int LEFT_COL_W = 250;
 
 	private final PlaylistStore store = new PlaylistStore();
@@ -483,6 +487,8 @@ public class AllMusicGuiScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent e) {
+		boolean inputFocused = (inputBox != null && inputBox.isFocused())
+				|| (cookieBox != null && cookieBox.isFocused());
 		if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER) && cookieBox != null && cookieBox.isFocused()) {
 			doLogin(cookieBox.getValue().trim());
 			return true;
@@ -495,6 +501,18 @@ public class AllMusicGuiScreen extends Screen {
 			}
 			if (tab == Tab.PLAYLIST) {
 				doSync();
+				return true;
+			}
+		}
+		if (!inputFocused && list != null && list.hasSongs()) {
+			if (e.key() == GLFW_KEY_UP) { list.moveUp(); return true; }
+			if (e.key() == GLFW_KEY_DOWN) { list.moveDown(); return true; }
+			if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER) && list.hasSelection()) {
+				list.activateSelected();
+				return true;
+			}
+			if ((e.key() == GLFW_KEY_DELETE || e.key() == GLFW_KEY_BACKSPACE) && tab == Tab.LOCAL && list.hasSelection()) {
+				removeSelected();
 				return true;
 			}
 		}

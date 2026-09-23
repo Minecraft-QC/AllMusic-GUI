@@ -91,4 +91,39 @@ public class SongListWidget {
 		scroll = Math.max(0, Math.min(maxScroll, scroll - (int) Math.signum(amount) * 3));
 		return true;
 	}
+
+	// ---------- 键盘/手柄导航（Controlify D-pad 映射方向键） ----------
+
+	public boolean hasSongs() { return !songs.isEmpty(); }
+	public boolean hasSelection() { return selected >= 0 && selected < songs.size(); }
+
+	public void moveUp() {
+		if (songs.isEmpty()) return;
+		if (selected < 0) { selected = songs.size() - 1; }
+		else if (selected > 0) { selected--; }
+		ensureVisible();
+	}
+
+	public void moveDown() {
+		if (songs.isEmpty()) return;
+		if (selected < 0) { selected = 0; }
+		else if (selected < songs.size() - 1) { selected++; }
+		ensureVisible();
+	}
+
+	private void ensureVisible() {
+		int visible = Math.max(1, h / ROW_H);
+		if (selected < scroll) scroll = selected;
+		else if (selected >= scroll + visible) scroll = selected - visible + 1;
+		int maxScroll = Math.max(0, songs.size() - visible);
+		scroll = Math.max(0, Math.min(maxScroll, scroll));
+	}
+
+	public void activateSelected() {
+		if (hasSelection() && onClick != null) onClick.onClick(songs.get(selected), 0);
+	}
+
+	public void favoriteSelected() {
+		if (hasSelection() && onClick != null) onClick.onClick(songs.get(selected), 1);
+	}
 }
