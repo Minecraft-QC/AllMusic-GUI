@@ -92,7 +92,7 @@ public final class NeteaseApi {
 		});
 	}
 
-	/** 网易云歌单详情（含歌曲列表） */
+	/** 网易云歌单详情（含歌曲列表）。v6/detail 对部分歌单只返回少量 tracks，用 trackIds + song/detail 拉全量兜底 */
 	public static CompletableFuture<NeteaseResult> playlist(long id) {
 		String url = "https://music.163.com/api/v6/playlist/detail?id=" + id;
 		return getJson(url).thenApply(json -> {
@@ -104,10 +104,47 @@ public final class NeteaseApi {
 				if (pl == null) return NeteaseResult.fail("歌单不存在或已下架");
 				List<Song> out = new ArrayList<>();
 				collectSongs(pl.getAsJsonArray("tracks"), out);
+				// 全量歌曲 ID（v6 可能只返回前若干首，trackIds 是完整列表）
+				JsonArray trackIds = pl.has("trackIds") && !pl.get("trackIds").isJsonNull()
+						? pl.getAsJsonArray("trackIds") : null;
+				if (trackIds != null && trackIds.size() > out.size()) {
+					StringBuilder sb = new StringBuilder("[");
+					boolean first = true;
+					int n = Math.min(trackIds.size(), 1000);
+					for (int i = 0; i < n; i++) {
+						JsonElement te = trackIds.get(i);
+						if (te == null || te.isJsonNull() || !te.getAsJsonObject().has("id")) continue;
+						if (!first) sb.append(",");
+						sb.append("{\"id\":").append(te.getAsJsonObject().get("id").getAsLong()).append("}");
+						first = false;
+					}
+					sb.append("]");
+					List<Song> full = songDetail(sb.toString()).join();
+					if (full.size() >= out.size()) out = full;
+				}
 				return NeteaseResult.ok(out);
 			} catch (Exception e) {
 				AllMusicGUI.LOGGER.warn("[AllMusicGUI] 歌单解析失败", e);
 				return NeteaseResult.fail("返回内容解析失败");
+			}
+		});
+	}
+
+	/** 批量 song/detail：c 形如 [{"id":1},{"id":2}]，返回解析后的歌曲列表 */
+	private static CompletableFuture<List<Song>> songDetail(String c) {
+		String url = "https://music.163.com/api/v3/song/detail?c=" + c;
+		return getJson(url).thenApply(json -> {
+			try {
+				JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+				int code = root.has("code") ? root.get("code").getAsInt() : -1;
+				if (code != 200) return new ArrayList<>();
+				JsonArray songs = root.getAsJsonArray("songs");
+				List<Song> out = new ArrayList<>();
+				collectSongs(songs, out);
+				return out;
+			} catch (Exception e) {
+				AllMusicGUI.LOGGER.warn("[AllMusicGUI] song/detail 解析失败", e);
+				return new ArrayList<>();
 			}
 		});
 	}
