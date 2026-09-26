@@ -1,6 +1,10 @@
 package com.allmusicgui.client.netease;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -130,20 +134,36 @@ public final class NeteaseApi {
 		});
 	}
 
-	/** 批量 song/detail：c 形如 [{"id":1},{"id":2}]，返回解析后的歌曲列表 */
+	/** 批量 song/detail：c 形如 [{"id":1},{"id":2}]，返回解析后的歌曲列表。
+	 *  该接口要求 query 里是未转义的 JSON（转义后返回 400），而 URI 会拒绝这些字符，
+	 *  因此这里用 URL+HttpURLConnection 绕过 URI 校验，原样发送。 */
 	private static CompletableFuture<List<Song>> songDetail(String c) {
-		String url = "https://music.163.com/api/v3/song/detail?c=" + c;
-		return getJson(url).thenApply(json -> {
+		return CompletableFuture.supplyAsync(() -> {
 			try {
-				JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+				URL u = new URL("https://music.163.com/api/v3/song/detail?c=" + c);
+				HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+				conn.setRequestMethod("GET");
+				conn.setRequestProperty("User-Agent", UA);
+				conn.setRequestProperty("Referer", "https://music.163.com/");
+				conn.setRequestProperty("Cookie", cookie);
+				conn.setRequestProperty("Accept", "application/json, text/plain, */*");
+				conn.setConnectTimeout(15000);
+				conn.setReadTimeout(15000);
+				if (conn.getResponseCode() != 200) return new ArrayList<>();
+				StringBuilder sb = new StringBuilder();
+				try (BufferedReader r = new BufferedReader(
+						new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+					String line;
+					while ((line = r.readLine()) != null) sb.append(line);
+				}
+				JsonObject root = JsonParser.parseString(sb.toString()).getAsJsonObject();
 				int code = root.has("code") ? root.get("code").getAsInt() : -1;
 				if (code != 200) return new ArrayList<>();
-				JsonArray songs = root.getAsJsonArray("songs");
 				List<Song> out = new ArrayList<>();
-				collectSongs(songs, out);
+				collectSongs(root.getAsJsonArray("songs"), out);
 				return out;
 			} catch (Exception e) {
-				AllMusicGUI.LOGGER.warn("[AllMusicGUI] song/detail 解析失败", e);
+				AllMusicGUI.LOGGER.warn("[AllMusicGUI] song/detail 请求失败", e);
 				return new ArrayList<>();
 			}
 		});
