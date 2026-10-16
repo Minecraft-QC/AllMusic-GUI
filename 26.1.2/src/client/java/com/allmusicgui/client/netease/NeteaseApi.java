@@ -123,7 +123,7 @@ public final class NeteaseApi {
 						first = false;
 					}
 					sb.append("]");
-					List<Song> full = songDetail(sb.toString()).join();
+					List<Song> full = songDetail(sb.toString());
 					if (full.size() >= out.size()) out = full;
 				}
 				return NeteaseResult.ok(out);
@@ -136,37 +136,39 @@ public final class NeteaseApi {
 
 	/** 批量 song/detail：c 形如 [{"id":1},{"id":2}]，返回解析后的歌曲列表。
 	 *  该接口要求 query 里是未转义的 JSON（转义后返回 400），而 URI 会拒绝这些字符，
-	 *  因此这里用 URL+HttpURLConnection 绕过 URI 校验，原样发送。 */
-	private static CompletableFuture<List<Song>> songDetail(String c) {
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				URL u = new URL("https://music.163.com/api/v3/song/detail?c=" + c);
-				HttpURLConnection conn = (HttpURLConnection) u.openConnection();
-				conn.setRequestMethod("GET");
-				conn.setRequestProperty("User-Agent", UA);
-				conn.setRequestProperty("Referer", "https://music.163.com/");
-				conn.setRequestProperty("Cookie", cookie);
-				conn.setRequestProperty("Accept", "application/json, text/plain, */*");
-				conn.setConnectTimeout(15000);
-				conn.setReadTimeout(15000);
-				if (conn.getResponseCode() != 200) return new ArrayList<>();
-				StringBuilder sb = new StringBuilder();
-				try (BufferedReader r = new BufferedReader(
-						new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-					String line;
-					while ((line = r.readLine()) != null) sb.append(line);
-				}
-				JsonObject root = JsonParser.parseString(sb.toString()).getAsJsonObject();
-				int code = root.has("code") ? root.get("code").getAsInt() : -1;
-				if (code != 200) return new ArrayList<>();
-				List<Song> out = new ArrayList<>();
-				collectSongs(root.getAsJsonArray("songs"), out);
-				return out;
-			} catch (Exception e) {
-				AllMusicGUI.LOGGER.warn("[AllMusicGUI] song/detail 请求失败", e);
-				return new ArrayList<>();
+	 *  因此这里用 URL+HttpURLConnection 绕过 URI 校验，原样发送。
+	 *  调用方已处于异步线程，故此处为同步阻塞方法。 */
+	private static List<Song> songDetail(String c) {
+		HttpURLConnection conn = null;
+		try {
+			URL u = new URL("https://music.163.com/api/v3/song/detail?c=" + c);
+			conn = (HttpURLConnection) u.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("User-Agent", UA);
+			conn.setRequestProperty("Referer", "https://music.163.com/");
+			conn.setRequestProperty("Cookie", cookie);
+			conn.setRequestProperty("Accept", "application/json, text/plain, */*");
+			conn.setConnectTimeout(15000);
+			conn.setReadTimeout(15000);
+			if (conn.getResponseCode() != 200) return new ArrayList<>();
+			StringBuilder sb = new StringBuilder();
+			try (BufferedReader r = new BufferedReader(
+					new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = r.readLine()) != null) sb.append(line);
 			}
-		});
+			JsonObject root = JsonParser.parseString(sb.toString()).getAsJsonObject();
+			int code = root.has("code") ? root.get("code").getAsInt() : -1;
+			if (code != 200) return new ArrayList<>();
+			List<Song> out = new ArrayList<>();
+			collectSongs(root.getAsJsonArray("songs"), out);
+			return out;
+		} catch (Exception e) {
+			AllMusicGUI.LOGGER.warn("[AllMusicGUI] song/detail 请求失败", e);
+			return new ArrayList<>();
+		} finally {
+			if (conn != null) conn.disconnect();
+		}
 	}
 
 	/** 歌手的热门歌曲（二级菜单下钻用） */
@@ -260,10 +262,10 @@ public final class NeteaseApi {
 				if (!o.has("id") || o.get("id").isJsonNull()) continue;
 				long id = o.get("id").getAsLong();
 				String name = safe(o, "name");
-				String artist = joinNames(o.getAsJsonArray("ar"));
-				if (artist.isEmpty()) artist = joinNames(o.getAsJsonArray("artists"));
+				String artist = joinNames(getArray(o, "ar"));
+				if (artist.isEmpty()) artist = joinNames(getArray(o, "artists"));
 				String album = "";
-				JsonArray al = o.getAsJsonArray("al");
+				JsonArray al = getArray(o, "al");
 				if (al != null && !al.isEmpty()) {
 					album = safe(al.get(0).getAsJsonObject(), "name");
 				} else if (o.has("album") && !o.get("album").isJsonNull()) {
@@ -331,6 +333,17 @@ public final class NeteaseApi {
 
 	// ---------- 工具 ----------
 
+	/** 安全的数组取值：缺 key / 非数组 / null 时返回 null，避免整条数据被丢弃。 */
+	private static JsonArray getArray(JsonObject o, String key) {
+		try {
+			JsonElement e = o.get(key);
+			if (e == null || e.isJsonNull() || !e.isJsonArray()) return null;
+			return e.getAsJsonArray();
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	private static String safe(JsonObject o, String key) {
 		try {
 			JsonElement e = o.get(key);
@@ -363,6 +376,7 @@ public final class NeteaseApi {
 						.header("Referer", "https://music.163.com/")
 						.header("Cookie", cookie)
 						.header("Accept", "application/json, text/plain, */*")
+						.timeout(Duration.ofSeconds(15))
 						.GET()
 						.build();
 				HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

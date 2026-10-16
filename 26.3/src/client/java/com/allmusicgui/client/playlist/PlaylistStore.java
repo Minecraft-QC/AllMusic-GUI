@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,7 +49,8 @@ public class PlaylistStore {
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final String LIKE_ID = "like";
+	/** 默认「喜欢」歌单的固定 id，界面层统一引用此常量，避免散落魔串 */
+	public static final String LIKE_ID = "like";
 
 	private final Path file;
 	private final Data data;
@@ -93,7 +95,15 @@ public class PlaylistStore {
 
 	private void save() {
 		try {
-			Files.writeString(file, GSON.toJson(data), StandardCharsets.UTF_8);
+			// 先写临时文件再原子替换，避免写盘中断损坏原配置
+			Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+			Files.writeString(tmp, GSON.toJson(data), StandardCharsets.UTF_8);
+			try {
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (Exception atomicFail) {
+				// 文件系统不支持原子替换时退化为普通覆盖
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (Exception e) {
 			AllMusicGUI.LOGGER.error("[AllMusicGUI] 本地歌单保存失败", e);
 		}
@@ -208,9 +218,20 @@ public class PlaylistStore {
 
 	// ---------- 同步歌单 ----------
 
-	public void saveSynced(SyncedPlaylist pl) {
+	/** 保存同步歌单。overwriteSameName=true 时，同名（不同 id）的旧歌单会被替换，避免同名单堆积。 */
+	public void saveSynced(SyncedPlaylist pl, boolean overwriteSameName) {
+		if (overwriteSameName) {
+			data.synced.entrySet().removeIf(e ->
+					!e.getKey().equals(String.valueOf(pl.id))
+					&& pl.name != null && pl.name.equals(e.getValue().name));
+		}
 		data.synced.put(String.valueOf(pl.id), pl);
 		save();
+	}
+
+	/** 旧签名兼容：默认覆盖同名歌单 */
+	public void saveSynced(SyncedPlaylist pl) {
+		saveSynced(pl, true);
 	}
 
 	public void removeSynced(long id) {

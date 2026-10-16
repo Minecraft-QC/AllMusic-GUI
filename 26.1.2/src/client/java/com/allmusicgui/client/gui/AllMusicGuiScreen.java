@@ -240,7 +240,7 @@ public class AllMusicGuiScreen extends Screen {
 						init();
 					})
 					.bounds(lx + CONTENT_W - 132, 38, 56, 18).build());
-			if (!"like".equals(currentPlaylistId)) {
+			if (!PlaylistStore.LIKE_ID.equals(currentPlaylistId)) {
 				addRenderableWidget(Button.builder(Component.literal("删除"), b -> {
 							store.removePlaylist(currentPlaylistId);
 							currentPlaylistId = null;
@@ -276,7 +276,7 @@ public class AllMusicGuiScreen extends Screen {
 		list = new SongListWidget(font, this::onSongClick);
 		list.setBounds(leftX, top + 60, leftW, Math.max(60, bottom - top - 60));
 		displaySongs.clear();
-		PlaylistStore.LocalPlaylist like = store.byId("like");
+		PlaylistStore.LocalPlaylist like = store.byId(PlaylistStore.LIKE_ID);
 		if (like != null) displaySongs.addAll(like.songs);
 		list.setSongs(displaySongs);
 
@@ -406,7 +406,7 @@ public class AllMusicGuiScreen extends Screen {
 				init();
 				return;
 			}
-			if ("单曲".equals(s.type)) {
+			if (Song.TYPE_SONG.equals(s.type)) {
 				// 弹出歌单选择菜单
 				pendingSong = s;
 				pickingPlaylist = true;
@@ -414,7 +414,7 @@ public class AllMusicGuiScreen extends Screen {
 				init();
 				return;
 			}
-			if ("歌手".equals(s.type) || "专辑".equals(s.type) || "歌单".equals(s.type)) {
+			if (Song.TYPE_ARTIST.equals(s.type) || Song.TYPE_ALBUM.equals(s.type) || Song.TYPE_PLAYLIST.equals(s.type)) {
 				// 直接保存整个内容为本地歌单
 				saveAsPlaylist(s);
 				return;
@@ -423,17 +423,17 @@ public class AllMusicGuiScreen extends Screen {
 			return;
 		}
 		// 左键
-		if ("单曲".equals(s.type)) {
+		if (Song.TYPE_SONG.equals(s.type)) {
 			MusicCommand.request(s);
 			status = "已发送点歌：" + s.name + "（/music " + s.id + "）";
 			if (closeAfterPlay) {
 				Minecraft.getInstance().setScreen(null);
 			}
-		} else if ("歌手".equals(s.type)) {
+		} else if (Song.TYPE_ARTIST.equals(s.type)) {
 			drillDown(s.id, s.name, NeteaseApi::artistSongs);
-		} else if ("专辑".equals(s.type)) {
+		} else if (Song.TYPE_ALBUM.equals(s.type)) {
 			drillDown(s.id, s.name, NeteaseApi::album);
-		} else if ("歌单".equals(s.type)) {
+		} else if (Song.TYPE_PLAYLIST.equals(s.type)) {
 			if (tab == Tab.PLAYLIST) {
 				openPlaylist(s.id, s.name);
 			} else {
@@ -448,9 +448,9 @@ public class AllMusicGuiScreen extends Screen {
 	private void saveAsPlaylist(Song s) {
 		status = "正在保存 “" + s.name + "” 为本地歌单…";
 		Function<Long, CompletableFuture<NeteaseApi.NeteaseResult>> loader;
-		if ("歌手".equals(s.type)) {
+		if (Song.TYPE_ARTIST.equals(s.type)) {
 			loader = NeteaseApi::artistSongs;
-		} else if ("专辑".equals(s.type)) {
+		} else if (Song.TYPE_ALBUM.equals(s.type)) {
 			loader = NeteaseApi::album;
 		} else {
 			loader = NeteaseApi::playlist;
@@ -567,7 +567,7 @@ public class AllMusicGuiScreen extends Screen {
 				sp.id = id;
 				sp.name = name;
 				sp.songs = new ArrayList<>(r.songs());
-				store.saveSynced(sp);
+				store.saveSynced(sp, overwriteSync);
 				listTitle = name + "（" + r.songs().size() + " 首）";
 				status = "歌单加载完成，左键点歌/右键收藏";
 			} else {
@@ -769,7 +769,7 @@ public class AllMusicGuiScreen extends Screen {
 				if (tab == Tab.LOCAL && currentPlaylistId == null) {
 					int idx = (int) list.selectedSong().id;
 					List<PlaylistStore.LocalPlaylist> pls = store.localPlaylists();
-					if (idx >= 0 && idx < pls.size() && !"like".equals(pls.get(idx).id)) {
+					if (idx >= 0 && idx < pls.size() && !PlaylistStore.LIKE_ID.equals(pls.get(idx).id)) {
 						store.removePlaylist(pls.get(idx).id);
 						status = "已删除歌单：" + pls.get(idx).name;
 						init();
@@ -783,6 +783,10 @@ public class AllMusicGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		// 弹窗打开时，滚动只作用于弹窗内，不穿透到底层歌曲列表
+		if (pickingPlaylist || namingPlaylist) {
+			return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+		}
 		if (list != null
 				&& mouseX >= list.x && mouseX < list.x + list.w
 				&& mouseY >= list.y && mouseY < list.y + list.h) {
@@ -794,6 +798,10 @@ public class AllMusicGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		// 弹窗打开时，点击优先交给弹窗按钮，不穿透到下层歌曲列表（避免点歌/选中被误触发）
+		if (pickingPlaylist || namingPlaylist) {
+			return super.mouseClicked(event, doubleClick);
+		}
 		if (list != null && list.mouseClicked(event.x(), event.y(), event.button())) {
 			return true;
 		}
@@ -868,7 +876,7 @@ public class AllMusicGuiScreen extends Screen {
 		g.text(font, name, ax + 56, top + 14, 0xFFA0A0A0);
 
 		if (list != null) list.render(g, mx, my);
-		PlaylistStore.LocalPlaylist like = store.byId("like");
+		PlaylistStore.LocalPlaylist like = store.byId(PlaylistStore.LIKE_ID);
 		int likeCount = like != null ? like.songs.size() : 0;
 		g.text(font, "本地歌单 · 喜欢（" + likeCount + "）", lx + 4, mineTop() + 52, 0xFFA0A0A0);
 

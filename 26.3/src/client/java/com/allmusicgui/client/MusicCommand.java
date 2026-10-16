@@ -4,6 +4,7 @@ import com.allmusicgui.AllMusicGUI;
 import com.allmusicgui.model.Song;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 /** 点歌命令发送：向服务器聊天发送 /music <ID>，由 AllMusic 服务端插件处理（26.3 版） */
 public final class MusicCommand {
@@ -23,7 +24,11 @@ public final class MusicCommand {
 	}
 
 	private static void feedback(String msg) {
-		// 26.3 已移除 setOverlayMessage；界面状态栏会显示结果，这里仅记日志。
+		// 26.3 已移除 setOverlayMessage，改用对应的 sendOverlayMessage，玩家在游戏内能看到点歌结果
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player != null) {
+			mc.player.sendOverlayMessage(Component.literal(msg));
+		}
 		AllMusicGUI.LOGGER.info("[AllMusicGUI] " + msg);
 	}
 }

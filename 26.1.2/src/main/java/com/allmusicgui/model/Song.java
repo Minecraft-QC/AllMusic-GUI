@@ -6,10 +6,16 @@ package com.allmusicgui.model;
  * type 字段区分来源类型，sub 为副标题（歌手-专辑 / 歌单简介等）。
  */
 public class Song {
+	/** 类型常量：与 SearchType 的 label 保持一致，避免界面层散落中文魔串。 */
+	public static final String TYPE_SONG = "单曲";
+	public static final String TYPE_ARTIST = "歌手";
+	public static final String TYPE_ALBUM = "专辑";
+	public static final String TYPE_PLAYLIST = "歌单";
+
 	public long id;
 	public String name = "";
 	public String sub = "";
-	public String type = "单曲";
+	public String type = TYPE_SONG;
 	public int duration; // 秒，单曲可用
 
 	public Song() {

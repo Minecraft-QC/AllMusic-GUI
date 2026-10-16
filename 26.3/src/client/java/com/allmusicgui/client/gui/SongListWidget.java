@@ -122,8 +122,4 @@ public class SongListWidget {
 	public void activateSelected() {
 		if (hasSelection() && onClick != null) onClick.onClick(songs.get(selected), 0);
 	}
-
-	public void favoriteSelected() {
-		if (hasSelection() && onClick != null) onClick.onClick(songs.get(selected), 1);
-	}
 }
