@@ -26,7 +26,7 @@ import net.minecraft.network.chat.Component;
  * - 本地歌单为多歌单，默认「喜欢」歌单，可新建/删除
  */
 public class AllMusicGuiScreen extends Screen {
-	public enum Tab { SEARCH, LOCAL, PLAYLIST, MINE }
+	public enum Tab { SEARCH, LOCAL, PLAYLIST, COMMAND, MINE }
 
 	private static final int CONTENT_W = 460;
 	private static final int TAB_H = 24;
@@ -156,6 +156,9 @@ public class AllMusicGuiScreen extends Screen {
 						.bounds(lx + CONTENT_W - 90, 38, 86, 18).build());
 				listTitle = "云歌单（输入 ID 同步）";
 			}
+			case COMMAND -> {
+				buildCommandPage(lx);
+			}
 			case MINE -> {
 				buildMinePage(lx);
 				return;
@@ -200,6 +203,64 @@ public class AllMusicGuiScreen extends Screen {
 
 	private int mineTop() { return 64; }
 	private int mineBottom() { return height - TAB_H - 38; }
+
+	/** 是否有弹窗打开（歌单选择 / 新建命名）。弹窗期间底层列表不应响应悬停与点击。 */
+	private boolean popupOpen() {
+		return pickingPlaylist || namingPlaylist;
+	}
+
+	// ---------- 指令页 ----------
+
+	/** 快捷指令：全部为 AllMusic 普通玩家可用指令，不含管理员指令。 */
+	private record QuickCommand(String label, String args, String hint, boolean toggle) {
+	}
+
+	private static final List<QuickCommand> QUICK_COMMANDS = List.of(
+			new QuickCommand("发起切歌投票", "vote", "已发起切歌投票，等待其他玩家同意", false),
+			new QuickCommand("同意切歌", "agree", "已同意当前的切歌投票", false),
+			new QuickCommand("取消我的投票", "vote cancel", "已取消你发起的切歌投票", false),
+			new QuickCommand("停止播放", "stop", "已停止接收音乐", false),
+			new QuickCommand("重新收听", "join", "已重新接收当前播放的歌曲", false),
+			new QuickCommand("查看队列", "list", "队列已显示在聊天栏", false),
+			new QuickCommand("取消我的点歌", "cancel", "已取消你点的那首歌", false),
+			new QuickCommand("静音开关", "mute", "静音已切换（再点一次恢复）", true),
+			new QuickCommand("全部界面开关", "hud enable", "全部 HUD 已切换", true),
+			new QuickCommand("歌词开关", "hud lyric enable", "歌词显示已切换", true),
+			new QuickCommand("歌曲信息开关", "hud info enable", "歌曲信息显示已切换", true),
+			new QuickCommand("播放状态开关", "hud state enable", "播放状态显示已切换", true),
+			new QuickCommand("专辑图开关", "hud pic enable", "专辑封面显示已切换", true),
+			new QuickCommand("重置界面", "hud reset", "HUD 位置与样式已恢复默认", false));
+
+	private void buildCommandPage(int lx) {
+		list = null; // 指令页没有歌曲列表，避免沿用上一页的控件
+		int cols = 2;
+		int gap = 8;
+		int btnW = (CONTENT_W - gap * (cols - 1)) / cols;
+		int rowH = 26;
+		int y = 66;
+		for (int i = 0; i < QUICK_COMMANDS.size(); i++) {
+			QuickCommand qc = QUICK_COMMANDS.get(i);
+			int col = i % cols;
+			int row = i / cols;
+			int bx = lx + col * (btnW + gap);
+			int by = y + row * rowH;
+			String text = (qc.toggle() ? "⇄ " : "▶ ") + qc.label();
+			addRenderableWidget(Button.builder(Component.literal(text), b -> {
+						MusicCommand.run(qc.args(), qc.label());
+						status = qc.hint();
+					})
+					.bounds(bx, by, btnW, 20).build());
+		}
+	}
+
+	private void renderCommandPage(GuiGraphics g, int lx) {
+		g.drawString(font, "快捷指令（普通玩家可用）", lx, 54, 0xFFA0A0A0);
+		int cols = 2;
+		int rowH = 26;
+		int hintY = 66 + ((QUICK_COMMANDS.size() + cols - 1) / cols) * rowH + 6;
+		g.drawString(font, "⇄ 为开关：再点一次恢复；▶ 为执行一次", lx, hintY, 0xFF8F8F8F);
+		g.drawString(font, "静音与 HUD 开关保存在服务端，换服需重新设置", lx, hintY + 12, 0xFF6E6E6E);
+	}
 
 	private void buildLocalPage(int lx) {
 		if (namingPlaylist) return;
@@ -343,16 +404,15 @@ public class AllMusicGuiScreen extends Screen {
 	}
 
 	private void addTabButtons(int lx) {
-		int tabW = CONTENT_W / 4;
+		Tab[] tabs = { Tab.SEARCH, Tab.LOCAL, Tab.PLAYLIST, Tab.COMMAND, Tab.MINE };
+		String[] labels = { "搜索", "歌单", "云歌单", "指令", "我的" };
+		int tabW = CONTENT_W / tabs.length;
 		int ty = height - TAB_H - 8;
-		addRenderableWidget(Button.builder(Component.literal("搜索"), b -> setTab(Tab.SEARCH))
-				.bounds(lx, ty, tabW, TAB_H).build());
-		addRenderableWidget(Button.builder(Component.literal("歌单"), b -> setTab(Tab.LOCAL))
-				.bounds(lx + tabW, ty, tabW, TAB_H).build());
-		addRenderableWidget(Button.builder(Component.literal("云歌单"), b -> setTab(Tab.PLAYLIST))
-				.bounds(lx + 2 * tabW, ty, tabW, TAB_H).build());
-		addRenderableWidget(Button.builder(Component.literal("我的"), b -> setTab(Tab.MINE))
-				.bounds(lx + 3 * tabW, ty, tabW, TAB_H).build());
+		for (int i = 0; i < tabs.length; i++) {
+			final Tab t = tabs[i];
+			addRenderableWidget(Button.builder(Component.literal(labels[i]), b -> setTab(t))
+					.bounds(lx + i * tabW, ty, tabW, TAB_H).build());
+		}
 	}
 
 	private static String toggleText(boolean on, String label) {
@@ -807,9 +867,11 @@ public class AllMusicGuiScreen extends Screen {
 
 		if (tab == Tab.MINE) {
 			renderMine(g, lx, mouseX, mouseY);
+		} else if (tab == Tab.COMMAND) {
+			renderCommandPage(g, lx);
 		} else {
 			g.drawString(font, listTitle, lx, 54, 0xFFA0A0A0);
-			if (list != null) list.render(g, mouseX, mouseY);
+			if (list != null) list.render(g, popupOpen() ? -1 : mouseX, popupOpen() ? -1 : mouseY);
 			if (tab == Tab.SEARCH && !hasSearched && !drilling) {
 				g.drawCenteredString(font, "请输入关键词并搜索歌曲", width / 2, height / 2 - 4, 0xFF8F8F8F);
 				g.drawCenteredString(font, "支持单曲 / 歌手 / 专辑 / 歌单", width / 2, height / 2 + 8, 0xFF6E6E6E);
@@ -862,7 +924,7 @@ public class AllMusicGuiScreen extends Screen {
 		g.drawString(font, isLoggedIn() ? "已登录" : "未登录", ax + 56, top + 2, isLoggedIn() ? 0xFF55FF55 : 0xFF8F8F8F);
 		g.drawString(font, name, ax + 56, top + 14, 0xFFA0A0A0);
 
-		if (list != null) list.render(g, mx, my);
+		if (list != null) list.render(g, popupOpen() ? -1 : mx, popupOpen() ? -1 : my);
 		PlaylistStore.LocalPlaylist like = store.byId(PlaylistStore.LIKE_ID);
 		int likeCount = like != null ? like.songs.size() : 0;
 		g.drawString(font, "本地歌单 · 喜欢（" + likeCount + "）", lx + 4, mineTop() + 52, 0xFFA0A0A0);

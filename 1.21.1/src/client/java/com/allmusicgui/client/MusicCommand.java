@@ -22,6 +22,17 @@ public final class MusicCommand {
 		overlay(mc, "§a已点歌 §f" + song.name + " §7(/music " + song.id + ")");
 	}
 
+	/** 发送任意 AllMusic 子指令（vote / stop / hud lyric enable 等，均为普通玩家可用）。 */
+	public static void run(String args, String label) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.getConnection() == null) {
+			overlay(mc, "§c未连接服务器，无法发送指令");
+			return;
+		}
+		mc.getConnection().sendCommand("music " + args);
+		overlay(mc, "§a" + label + " §7(/music " + args + ")");
+	}
+
 	private static void overlay(Minecraft mc, String msg) {
 		if (mc.gui != null) {
 			mc.gui.setOverlayMessage(Component.literal(msg), false);

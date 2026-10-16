@@ -23,6 +23,17 @@ public final class MusicCommand {
 		feedback("已点歌：" + song.name + "（/music " + song.id + "）");
 	}
 
+	/** 发送任意 AllMusic 子指令（vote / stop / hud lyric enable 等，均为普通玩家可用）。 */
+	public static void run(String args, String label) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.getConnection() == null) {
+			feedback("未连接服务器，无法发送指令");
+			return;
+		}
+		mc.getConnection().sendCommand("music " + args);
+		feedback(label + "（/music " + args + "）");
+	}
+
 	private static void feedback(String msg) {
 		// 26.3 已移除 setOverlayMessage，改用对应的 sendOverlayMessage，玩家在游戏内能看到点歌结果
 		Minecraft mc = Minecraft.getInstance();
