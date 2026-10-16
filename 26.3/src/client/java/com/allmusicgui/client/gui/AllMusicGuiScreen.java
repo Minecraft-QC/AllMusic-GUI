@@ -125,9 +125,7 @@ public class AllMusicGuiScreen extends Screen {
 			case SEARCH -> {
 				inputBox.setValue(keyword);
 				inputBox.setHint(Component.literal("搜索歌名 / 歌手 / 专辑 / 歌单…"));
-				if (!drilling && !pickingPlaylist && !namingPlaylist) {
-					setInitialFocus(inputBox);
-				}
+				// 焦点统一由 setInitialFocus() 决定
 				typeButtons.clear();
 				if (!pickingPlaylist && !namingPlaylist) {
 					SearchType[] types = SearchType.values();
@@ -156,9 +154,6 @@ public class AllMusicGuiScreen extends Screen {
 			case PLAYLIST -> {
 				inputBox.setValue(playlistId);
 				inputBox.setHint(Component.literal("输入网易云歌单 ID（数字）"));
-				if (!pickingPlaylist && !namingPlaylist) {
-					setInitialFocus(inputBox);
-				}
 				addRenderableWidget(Button.builder(Component.literal("同步"), b -> doSync())
 						.bounds(lx + CONTENT_W - 90, 38, 86, 18).build());
 				listTitle = "云歌单（输入 ID 同步）";
@@ -223,14 +218,12 @@ public class AllMusicGuiScreen extends Screen {
 	}
 
 	private static final List<QuickCommand> QUICK_COMMANDS = List.of(
+			new QuickCommand("静音开关", "mute", "静音已切换（再点一次恢复）", true),
 			new QuickCommand("发起切歌投票", "vote", "已发起切歌投票，等待其他玩家同意", false),
 			new QuickCommand("同意切歌", "agree", "已同意当前的切歌投票", false),
 			new QuickCommand("取消我的投票", "vote cancel", "已取消你发起的切歌投票", false),
-			new QuickCommand("停止播放", "stop", "已停止接收音乐", false),
-			new QuickCommand("重新收听", "join", "已重新接收当前播放的歌曲", false),
 			new QuickCommand("查看队列", "list", "队列已显示在聊天栏", false),
 			new QuickCommand("取消我的点歌", "cancel", "已取消你点的那首歌", false),
-			new QuickCommand("静音开关", "mute", "静音已切换（再点一次恢复）", true),
 			new QuickCommand("全部界面开关", "hud enable", "全部 HUD 已切换", true),
 			new QuickCommand("歌词开关", "hud lyric enable", "歌词显示已切换", true),
 			new QuickCommand("歌曲信息开关", "hud info enable", "歌曲信息显示已切换", true),
@@ -693,7 +686,6 @@ public class AllMusicGuiScreen extends Screen {
 			nameBox.setValue(pendingName);
 			nameBox.setHint(Component.literal("输入歌单名称"));
 			addRenderableWidget(nameBox);
-			setInitialFocus(nameBox);
 			addRenderableWidget(Button.builder(Component.literal("确认创建"), b -> confirmCreate())
 					.bounds(px + 30, py + 70, (bw - 8) / 2, 18).build());
 			addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
@@ -965,6 +957,28 @@ public class AllMusicGuiScreen extends Screen {
 	@Override
 	public boolean isPauseScreen() {
 		return false;
+	}
+
+	/**
+	 * 覆盖基类的初始聚焦。
+	 * 基类实现只在“上一次输入是键盘”时才聚焦，且是从当前焦点再 Tab 一格，
+	 * 因此用鼠标开界面时焦点落空、用 G 键开界面时焦点会跳到页签而不是搜索框。
+	 * 这里改为按页面直接指定控件：搜索/云歌单页聚焦输入框，登录与新建歌单弹窗
+	 * 聚焦各自的输入框；下钻或其他页不抢焦点，把方向键/回车留给歌曲列表。
+	 */
+	@Override
+	protected void setInitialFocus() {
+		if (namingPlaylist && nameBox != null) {
+			setInitialFocus(nameBox);
+			return;
+		}
+		if (loginMode && cookieBox != null) {
+			setInitialFocus(cookieBox);
+			return;
+		}
+		if (inputBox != null && !drilling && !popupOpen()) {
+			setInitialFocus(inputBox);
+		}
 	}
 
 	@Override
