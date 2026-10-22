@@ -12,7 +12,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
  *  注意：26.x 的 text() 要求颜色带非零 alpha，否则整段被丢弃。 */
 public class SongListWidget {
 	public interface ClickHandler {
-		/** button: GLFW 鼠标键（0=左键 播放，1=右键 收藏） */
+		/** button: 界面内部逻辑值（0=左键 播放，1=右键 收藏）。
+		 *  26.3 输入层为 SDL3（原生左=1 右=3），由 AllMusicGuiScreen.mouseClicked 统一翻译后传入。 */
 		void onClick(Song song, int button);
 	}
 

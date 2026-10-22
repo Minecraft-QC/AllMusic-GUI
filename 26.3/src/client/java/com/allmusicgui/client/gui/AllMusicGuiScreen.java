@@ -11,6 +11,8 @@ import com.allmusicgui.client.playlist.PlaylistStore;
 import com.allmusicgui.model.SearchType;
 import com.allmusicgui.model.Song;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -34,13 +36,15 @@ public class AllMusicGuiScreen extends Screen {
 
 	private static final int CONTENT_W = 460;
 	private static final int TAB_H = 24;
-	private static final int GLFW_KEY_ENTER = 257;
-	private static final int GLFW_KEY_KP_ENTER = 335;
-	private static final int GLFW_KEY_ESCAPE = 256;
-	private static final int GLFW_KEY_UP = 265;
-	private static final int GLFW_KEY_DOWN = 264;
-	private static final int GLFW_KEY_DELETE = 261;
-	private static final int GLFW_KEY_BACKSPACE = 259;
+	// 26.3 起输入层切换到 SDL3：KeyEvent.key() 是 SDL3 scancode，鼠标按钮为 1=左 2=中 3=右。
+	// 这里引用官方 InputConstants 常量（编译期内联），不要再写死 GLFW 数值。
+	private static final int KEY_ENTER = InputConstants.KEY_RETURN;        // 40
+	private static final int KEY_KP_ENTER = InputConstants.KEY_NUMPADENTER; // 88
+	private static final int KEY_ESCAPE = InputConstants.KEY_ESCAPE;        // 41
+	private static final int KEY_UP = InputConstants.KEY_UP;                // 82
+	private static final int KEY_DOWN = InputConstants.KEY_DOWN;            // 81
+	private static final int KEY_DELETE = InputConstants.KEY_DELETE;        // 76
+	private static final int KEY_BACKSPACE = InputConstants.KEY_BACKSPACE;  // 42
 	private static final int LEFT_COL_W = 250;
 	private static final int POPUP_W = 300;
 	private static final int POPUP_MAX_ROWS = 8;
@@ -747,7 +751,7 @@ public class AllMusicGuiScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent e) {
 		// ESC：二级菜单返回，一级关闭
-		if (e.key() == GLFW_KEY_ESCAPE) {
+		if (e.key() == KEY_ESCAPE) {
 			if (pickingPlaylist) {
 				pickingPlaylist = false;
 				pendingSong = null;
@@ -774,15 +778,15 @@ public class AllMusicGuiScreen extends Screen {
 		boolean inputFocused = (inputBox != null && inputBox.isFocused())
 				|| (cookieBox != null && cookieBox.isFocused())
 				|| (nameBox != null && nameBox.isFocused());
-		if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER) && cookieBox != null && cookieBox.isFocused()) {
+		if ((e.key() == KEY_ENTER || e.key() == KEY_KP_ENTER) && cookieBox != null && cookieBox.isFocused()) {
 			doLogin(cookieBox.getValue().trim());
 			return true;
 		}
-		if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER) && nameBox != null && nameBox.isFocused()) {
+		if ((e.key() == KEY_ENTER || e.key() == KEY_KP_ENTER) && nameBox != null && nameBox.isFocused()) {
 			confirmCreate();
 			return true;
 		}
-		if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER)
+		if ((e.key() == KEY_ENTER || e.key() == KEY_KP_ENTER)
 				&& inputBox != null && inputBox.isFocused()) {
 			if (tab == Tab.SEARCH) {
 				doSearch();
@@ -795,13 +799,13 @@ public class AllMusicGuiScreen extends Screen {
 		}
 		// 键盘/手柄导航：输入框未聚焦时，方向键选择歌曲，Enter 播放，Delete 移除
 		if (!inputFocused && !pickingPlaylist && !namingPlaylist && list != null && list.hasSongs()) {
-			if (e.key() == GLFW_KEY_UP) { list.moveUp(); return true; }
-			if (e.key() == GLFW_KEY_DOWN) { list.moveDown(); return true; }
-			if ((e.key() == GLFW_KEY_ENTER || e.key() == GLFW_KEY_KP_ENTER) && list.hasSelection()) {
+			if (e.key() == KEY_UP) { list.moveUp(); return true; }
+			if (e.key() == KEY_DOWN) { list.moveDown(); return true; }
+			if ((e.key() == KEY_ENTER || e.key() == KEY_KP_ENTER) && list.hasSelection()) {
 				list.activateSelected();
 				return true;
 			}
-			if ((e.key() == GLFW_KEY_DELETE || e.key() == GLFW_KEY_BACKSPACE) && list.hasSelection()) {
+			if ((e.key() == KEY_DELETE || e.key() == KEY_BACKSPACE) && list.hasSelection()) {
 				if (tab == Tab.LOCAL && currentPlaylistId != null) {
 					removeSelectedFromLocal();
 					return true;
@@ -842,7 +846,15 @@ public class AllMusicGuiScreen extends Screen {
 		if (pickingPlaylist || namingPlaylist) {
 			return super.mouseClicked(event, doubleClick);
 		}
-		if (list != null && list.mouseClicked(event.x(), event.y(), event.button())) {
+		// 26.3 输入层为 SDL3：鼠标按钮 1=左 2=中 3=右（GLFW 时代是 0=左 1=右）。
+		// 翻译成界面内部逻辑值 0=左 1=右 再下传，onSongClick/SongListWidget 的既有逻辑不变。
+		int sdlButton = event.button();
+		int logical = sdlButton == InputConstants.MOUSE_BUTTON_LEFT ? 0
+				: sdlButton == InputConstants.MOUSE_BUTTON_RIGHT ? 1 : -1;
+		if (logical == 0 && list != null && list.mouseClicked(event.x(), event.y(), 0)) {
+			return true;
+		}
+		if (logical == 1 && list != null && list.mouseClicked(event.x(), event.y(), 1)) {
 			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
